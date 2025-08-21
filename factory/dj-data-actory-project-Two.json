@@ -1,0 +1,9 @@
+{
+	"name": "dj-data-actory-project-Two",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "e04e7e4c-8f7d-4570-869a-ed4f70a504b3",
+		"tenantId": "ea01abf1-864b-4115-8bcc-f647e192575a"
+	}
+}

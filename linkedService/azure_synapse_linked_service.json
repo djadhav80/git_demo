@@ -1,0 +1,21 @@
+{
+	"name": "azure_synapse_linked_service",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDW",
+		"typeProperties": {
+			"server": "dnyaneshdatawarehouseserver.database.windows.net",
+			"database": "dnyaneshdatawarhouse",
+			"encrypt": "mandatory",
+			"trustServerCertificate": true,
+			"authenticationType": "SQL",
+			"userName": "dnyanesh",
+			"encryptedCredential": "eyJDcmVkZW50aWFsSWQiOiJiOTE0YzA0MS1iMDExLTRiNjUtOTY0OS1jMGM0ODdhN2I1MDkiLCJWZXJzaW9uIjoiMi4wIiwiQ2xhc3NUeXBlIjoiTWljcm9zb2Z0LkRhdGFQcm94eS5Db3JlLkludGVyU2VydmljZURhdGFDb250cmFjdC5DcmVkZW50aWFsU1UwNkNZMTQifQ=="
+		},
+		"connectVia": {
+			"referenceName": "integrationRuntime1",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

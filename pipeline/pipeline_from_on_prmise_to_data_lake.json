@@ -1,0 +1,267 @@
+{
+	"name": "pipeline_from_on_prmise_to_data_lake",
+	"properties": {
+		"activities": [
+			{
+				"name": "Lookup_get_data_from_metadata",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "SqlDWSource",
+						"sqlReaderQuery": "select * from metadata_table where status <>'succussed'",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "Azure_Synapse_get_metadata",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach_get_file_from_lookup",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup_get_data_from_metadata",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup_get_data_from_metadata').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Copy data_file_from_on_premise",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "FileServerReadSettings",
+										"recursive": true,
+										"wildcardFileName": "*",
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".csv"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "copy_data_from_on_premise",
+									"type": "DatasetReference",
+									"parameters": {
+										"sourcefoldername": {
+											"value": "@item().source_folder",
+											"type": "Expression"
+										},
+										"sourcefilename": {
+											"value": "@item().source_filename",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "files_loading_in_data_lake",
+									"type": "DatasetReference",
+									"parameters": {
+										"sourcefolder": {
+											"value": "@item().source_folder",
+											"type": "Expression"
+										},
+										"destinationtable": {
+											"value": "@item().destination_table",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Stored procedure_for_successfull",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy data_file_from_on_premise",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[sp_succeefull]",
+								"storedProcedureParameters": {
+									"source_filename": {
+										"value": {
+											"value": "@item().source_filename",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": "succussed",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "azure_synapse_linked_service",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Stored procedure_for_failed",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Copy data_file_from_on_premise",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[sp_failed]",
+								"storedProcedureParameters": {
+									"status": {
+										"value": "failed",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "azure_synapse_linked_service",
+								"type": "LinkedServiceReference"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Stored procedure_for_rest_status_metadata",
+				"type": "SqlServerStoredProcedure",
+				"dependsOn": [
+					{
+						"activity": "ForEach_get_file_from_lookup",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"storedProcedureName": "[dbo].[sp_reset]",
+					"storedProcedureParameters": {
+						"status": {
+							"value": "ready",
+							"type": "String"
+						}
+					}
+				},
+				"linkedServiceName": {
+					"referenceName": "azure_synapse_linked_service",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "Web_send_mail_if_failed",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "ForEach_get_file_from_lookup",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://prod-18.northcentralus.logic.azure.com:443/workflows/6eedc0f7817641c0bd85d6f3b67444ba/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=X545zI6cllYulk1SvYV1y2z2moKJ8TvXHl55FsMFShE"
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2025-08-19T18:45:44Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
